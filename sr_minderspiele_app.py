@@ -9,7 +9,7 @@ st.set_page_config(page_title="SR-Minderspiele Auswertung", layout="wide")
 st.title("Auswertung SR-Minderspiele für mehrere Spielzeiten")
 
 st.markdown("""
-Diese App berechnet: test
+Diese App berechnet:
 - **Minderspiele** je Verein pro Spielzeit
 - **Fehlabgabe** gemäß §38 Abs. 3 SpO
 - **Punktabzug** bei drei aufeinanderfolgenden Jahren mit über 30% Minderspielen
@@ -96,16 +96,13 @@ def berechne_beitrag_regel(minder, bonus):
                 beitrag[2] = (m24 * 50 - b24 * 50
                 )
             elif m22 < m23 and m23 > m24:
-                if m22 > m24:
-                    beitrag[2] = (m24 * 50 - b24 * 50
-                )
-                else:
+
                 # Fall: steigende Staffelung, dann Rückgang
-                    beitrag[2] = (
+                beitrag[2] = (
                     m22 * 50 +
                     (m24 - m22) * 25 -
                     b24 * 50
-                    )
+                )
             elif m24 > m23:
                 if m22 < m23:
                     beitrag[2] = (
@@ -124,7 +121,10 @@ def berechne_beitrag_regel(minder, bonus):
                     beitrag[2] = m24 * 50 - b24 * 50
 
             elif m24 < m23:
-                beitrag[2] = m24 * 50 - b24 * 50
+                if m22 == m23:
+                    beitrag[2] = m24 * 50 - b24 * 50
+                elif m22 > m23:
+                    beitrag[2] = m24 * 50 - b24 * 50
                 
 
     beitrag = [max(0.0, round(b, 2)) for b in beitrag]
