@@ -9,7 +9,7 @@ st.set_page_config(page_title="SR-Minderspiele Auswertung", layout="wide")
 st.title("Auswertung SR-Minderspiele für mehrere Spielzeiten")
 
 st.markdown("""
-Diese App berechnet:
+Diese App berechnet: test
 - **Minderspiele** je Verein pro Spielzeit
 - **Fehlabgabe** gemäß §38 Abs. 3 SpO
 - **Punktabzug** bei drei aufeinanderfolgenden Jahren mit über 30% Minderspielen
