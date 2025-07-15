@@ -51,7 +51,7 @@ def verarbeite_jahr(soll_df, sr_df, saison):
 
     bonus_df = sr_df.copy()
     bonus_df['Anzahl geleitet'] = bonus_df['Anzahl geleitet'].fillna(0)
-    bonus_df['Bonus'] = bonus_df['Anzahl geleitet'].apply(lambda x: 1 if x >= 15 else 0)
+    bonus_df['Bonus'] = bonus_df['Anzahl geleitet'].apply(lambda x: int(x) // 15)
     bonus_verein = bonus_df.groupby('VereinsNr')['Bonus'].sum().reset_index()
     bonus_verein.columns = ['VereinsNr', 'Bonus_SR']
 
@@ -92,13 +92,20 @@ def berechne_beitrag_regel(minder, bonus):
                 beitrag[2] = m24 * 25 - b24 * 50
 
         elif m23 > 0 and m22 > 0:
-            if m22 < m23 and m23 > m24:
+            if  m24 < m22 < m23:
+                beitrag[2] = (m24 * 50 - b24 * 50
+                )
+            elif m22 < m23 and m23 > m24:
+                if m22 > m24:
+                    beitrag[2] = (m24 * 50 - b24 * 50
+                )
+                else:
                 # Fall: steigende Staffelung, dann Rückgang
-                beitrag[2] = (
+                    beitrag[2] = (
                     m22 * 50 +
                     (m24 - m22) * 25 -
                     b24 * 50
-                )
+                    )
             elif m24 > m23:
                 if m22 < m23:
                     beitrag[2] = (
@@ -117,10 +124,8 @@ def berechne_beitrag_regel(minder, bonus):
                     beitrag[2] = m24 * 50 - b24 * 50
 
             elif m24 < m23:
-                if m22 == m23:
-                    beitrag[2] = m24 * 50 - b24 * 50
-                elif m22 > m23:
-                    beitrag[2] = m24 * 50 - b24 * 50
+                beitrag[2] = m24 * 50 - b24 * 50
+                
 
     beitrag = [max(0.0, round(b, 2)) for b in beitrag]
     return beitrag
