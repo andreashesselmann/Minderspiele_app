@@ -38,12 +38,25 @@ def to_float(x):
         return 0.0
 
 def lade_csv_oder_excel(uploaded_file):
-    if uploaded_file:
-        if uploaded_file.name.endswith(".csv"):
+    if uploaded_file is None:
+        return None
+
+    uploaded_file.seek(0)
+
+    try:
+        if uploaded_file.name.lower().endswith(".csv"):
             return pd.read_csv(uploaded_file, sep=';', encoding='ISO-8859-1')
-        elif uploaded_file.name.endswith(".xlsx"):
+        elif uploaded_file.name.lower().endswith(".xlsx"):
             return pd.read_excel(uploaded_file)
-    return None
+        else:
+            st.error(f"Nicht unterstützter Dateityp: {uploaded_file.name}")
+            return None
+    except pd.errors.EmptyDataError:
+        st.error(f"Die Datei {uploaded_file.name} ist leer oder konnte nicht gelesen werden.")
+        return None
+    except Exception as e:
+        st.error(f"Fehler beim Laden der Datei {uploaded_file.name}: {e}")
+        return None
 
 def verarbeite_jahr(soll_df, sr_df, saison):
     soll_df = soll_df.copy()
@@ -131,48 +144,48 @@ def berechne_beitrag_regel(minder, bonus):
 
     if m25 > 0:
         if m24 <= 0:
-            beitrag[2] = m25 * 15 - b25 * 50
+            beitrag[3] = m25 * 15 - b25 * 50
 
         elif m24 > 0 and m23 <= 0:
             if m25 > m24:
-                beitrag[2] = m24 * 25 + (m25 - m24) * 15 - b25 * 50
+                beitrag[3] = m24 * 25 + (m25 - m24) * 15 - b25 * 50
             else:
-                beitrag[2] = m25 * 25 - b25 * 50
+                beitrag[3] = m25 * 25 - b25 * 50
 
         elif m24 > 0 and m23 > 0:
             if  m25 < m23 < m24:
-                beitrag[2] = (m25 * 50 - b25 * 50
+                beitrag[3] = (m25 * 50 - b25 * 50
                 )
             elif m23 < m24 and m24 > m25:
 
                 # Fall: steigende Staffelung, dann Rückgang
-                beitrag[2] = (
+                beitrag[3] = (
                     m23 * 50 +
                     (m25 - m23) * 25 -
                     b25 * 50
                 )
             elif m25 > m24:
                 if m23 < m24:
-                    beitrag[2] = (
+                    beitrag[3] = (
                         m23 * 50 +
                         (m24 - m23) * 25 +
                         (m25 - m24) * 15 -
                         b25 * 50
                     )
                 else:
-                    beitrag[2] = m24 * 50 + (m25 - m24) * 15 - b25 * 50
+                    beitrag[3] = m24 * 50 + (m25 - m24) * 15 - b25 * 50
 
             elif m25 == m24:
                 if m23 < m24:
-                    beitrag[2] = m23 * 50 + (m24 - m23) * 25 - b25 * 50
+                    beitrag[3] = m23 * 50 + (m24 - m23) * 25 - b25 * 50
                 else:
-                    beitrag[2] = m25 * 50 - b25 * 50
+                    beitrag[3] = m25 * 50 - b25 * 50
 
             elif m25 < m24:
                 if m23 == m24:
-                    beitrag[2] = m25 * 50 - b25 * 50
+                    beitrag[3] = m25 * 50 - b25 * 50
                 elif m23 > m24:
-                    beitrag[2] = m25 * 50 - b25 * 50
+                    beitrag[3] = m25 * 50 - b25 * 50
 
     beitrag = [max(0.0, round(b, 2)) for b in beitrag]
     return beitrag
@@ -195,7 +208,7 @@ def berechne_punktabzug(gesamt_df):
     abzug_df = abzug_df.reset_index()
     vereinsinfo = gesamt_df.drop_duplicates(subset='Vereins-Nr')[['Vereins-Nr', 'Vereinsname', 'Vereins-Region']]
     abzug_df = abzug_df.merge(vereinsinfo, on='Vereins-Nr', how='left')
-    return abzug_df[['Vereins-Nr', 'Vereinsname', 'Vereins-Region', 'Quote_22_23 (wird nicht mit einberechnet)', 'Quote_23_24', 'Quote_24_25', 'Quote_24_25', 'Punktabzug']]
+    return abzug_df[['Vereins-Nr', 'Vereinsname', 'Vereins-Region', 'Quote_22_23', 'Quote_23_24', 'Quote_24_25', 'Quote_25_26', 'Punktabzug']]
 
 def erstelle_zip_export(df):
     zip_buffer = io.BytesIO()
@@ -221,7 +234,7 @@ if uploaded_soll_2022 and uploaded_sr_2022 and uploaded_soll_2023 and uploaded_s
     df_22 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2022), lade_csv_oder_excel(uploaded_sr_2022), saison="2022/23")
     df_23 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2023), lade_csv_oder_excel(uploaded_sr_2023), saison="2023/24")
     df_24 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2024), lade_csv_oder_excel(uploaded_sr_2024), saison="2024/25")
-    df_25 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2024), lade_csv_oder_excel(uploaded_sr_2025), saison="2025/26")
+    df_25 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2025), lade_csv_oder_excel(uploaded_sr_2025), saison="2025/26")
 
     gesamt_df = pd.concat([df_22, df_23, df_24, df_25], ignore_index=True)
     gesamt_df = gesamt_df.sort_values(by=["Vereins-Nr", "Saison"])
