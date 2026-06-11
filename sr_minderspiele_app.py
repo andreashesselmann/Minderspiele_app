@@ -11,7 +11,7 @@ st.title("Auswertung SR-Minderspiele für mehrere Spielzeiten")
 st.markdown("""
 Diese App berechnet: test
 - **Minderspiele** je Verein pro Spielzeit
-- **Fehlabgabe** gemäß §38 Abs. 3 SpO
+- **Fehlabgabe** gemäß SRO § 17 (3) und (4) und SPO Anhang II Absatz III
 - **Punktabzug** bei drei aufeinanderfolgenden Jahren mit über 30% Minderspielen
 - Erstellung der Importdateien für nuLiga mit korrekter Kodierung für Umlaute und Sonderzeichen
 - Export aller Importdateien als ZIP
@@ -27,6 +27,9 @@ uploaded_sr_2023 = st.file_uploader("📥 Datei mit SR-Einsätzen 2023/24", type
 
 uploaded_soll_2024 = st.file_uploader("📥 Datei mit Soll/Ist-Zahlen 2024/25", type=["csv", "xlsx"])
 uploaded_sr_2024 = st.file_uploader("📥 Datei mit SR-Einsätzen 2024/25", type=["csv", "xlsx"])
+
+uploaded_soll_2025 = st.file_uploader("📥 Datei mit Soll/Ist-Zahlen 2025/26", type=["csv", "xlsx"])
+uploaded_sr_2025 = st.file_uploader("📥 Datei mit SR-Einsätzen 2025/26", type=["csv", "xlsx"])
 
 def to_float(x):
     try:
@@ -65,9 +68,9 @@ def verarbeite_jahr(soll_df, sr_df, saison):
     return soll_df[['Vereins-Nr', 'Vereinsname', 'Vereins-Region', 'Soll', 'Ist', 'Minder', 'Quote', 'Bonus_SR', 'Saison']]
 
 def berechne_beitrag_regel(minder, bonus):
-    m22, m23, m24 = minder
-    b22, b23, b24 = bonus
-    beitrag = [0.0, 0.0, 0.0]
+    m22, m23, m24, m25 = minder
+    b22, b23, b24, b25 = bonus
+    beitrag = [0.0, 0.0, 0.0, 0.0]
 
     if m22 > 0:
         beitrag[0] = m22 * 15 - b22 * 50
@@ -125,7 +128,51 @@ def berechne_beitrag_regel(minder, bonus):
                     beitrag[2] = m24 * 50 - b24 * 50
                 elif m22 > m23:
                     beitrag[2] = m24 * 50 - b24 * 50
-                
+
+    if m25 > 0:
+        if m24 <= 0:
+            beitrag[2] = m25 * 15 - b25 * 50
+
+        elif m24 > 0 and m23 <= 0:
+            if m25 > m24:
+                beitrag[2] = m24 * 25 + (m25 - m24) * 15 - b25 * 50
+            else:
+                beitrag[2] = m25 * 25 - b25 * 50
+
+        elif m24 > 0 and m23 > 0:
+            if  m25 < m23 < m24:
+                beitrag[2] = (m25 * 50 - b25 * 50
+                )
+            elif m23 < m24 and m24 > m25:
+
+                # Fall: steigende Staffelung, dann Rückgang
+                beitrag[2] = (
+                    m23 * 50 +
+                    (m25 - m23) * 25 -
+                    b25 * 50
+                )
+            elif m25 > m24:
+                if m23 < m24:
+                    beitrag[2] = (
+                        m23 * 50 +
+                        (m24 - m23) * 25 +
+                        (m25 - m24) * 15 -
+                        b25 * 50
+                    )
+                else:
+                    beitrag[2] = m24 * 50 + (m25 - m24) * 15 - b25 * 50
+
+            elif m25 == m24:
+                if m23 < m24:
+                    beitrag[2] = m23 * 50 + (m24 - m23) * 25 - b25 * 50
+                else:
+                    beitrag[2] = m25 * 50 - b25 * 50
+
+            elif m25 < m24:
+                if m23 == m24:
+                    beitrag[2] = m25 * 50 - b25 * 50
+                elif m23 > m24:
+                    beitrag[2] = m25 * 50 - b25 * 50
 
     beitrag = [max(0.0, round(b, 2)) for b in beitrag]
     return beitrag
@@ -136,9 +183,10 @@ def berechne_punktabzug(gesamt_df):
     abzug_df['Quote_22_23'] = gruppiert.get('2022/23', 0)
     abzug_df['Quote_23_24'] = gruppiert.get('2023/24', 0)
     abzug_df['Quote_24_25'] = gruppiert.get('2024/25', 0)
+    abzug_df['Quote_25_26'] = gruppiert.get('2025/26', 0)
 
     def berechne_reihe(row):
-        folgen = [row['Quote_22_23'] > 0.3, row['Quote_23_24'] > 0.3, row['Quote_24_25'] > 0.3]
+        folgen = [row['Quote_23_24'] > 0.3, row['Quote_24_25'] > 0.3, row['Quote_25_26'] > 0.3]
         if sum(folgen) == 3:
             return 2 + 2 * (sum(folgen) - 3)
         return 0
@@ -147,7 +195,7 @@ def berechne_punktabzug(gesamt_df):
     abzug_df = abzug_df.reset_index()
     vereinsinfo = gesamt_df.drop_duplicates(subset='Vereins-Nr')[['Vereins-Nr', 'Vereinsname', 'Vereins-Region']]
     abzug_df = abzug_df.merge(vereinsinfo, on='Vereins-Nr', how='left')
-    return abzug_df[['Vereins-Nr', 'Vereinsname', 'Vereins-Region', 'Quote_22_23', 'Quote_23_24', 'Quote_24_25', 'Punktabzug']]
+    return abzug_df[['Vereins-Nr', 'Vereinsname', 'Vereins-Region', 'Quote_22_23 (wird nicht mit einberechnet)', 'Quote_23_24', 'Quote_24_25', 'Quote_24_25', 'Punktabzug']]
 
 def erstelle_zip_export(df):
     zip_buffer = io.BytesIO()
@@ -160,7 +208,7 @@ def erstelle_zip_export(df):
                 if not region_df.empty:
                     export_df = pd.DataFrame({
                         'VereinNr': region_df['Vereins-Nr'],
-                        'Lieferscheintext': f"Fehlabgabe gemäß §38 Abs. 3 SpO für SR-Minderspiele Saison {saison}",
+                        'Lieferscheintext': f"Fehlabgabe gemaeß SRO § 17 Abs (3) und (4) und SPO Anhang II Abschnitt III für SR-Minderspiele Saison {saison}",
                         'Datum': today,
                         'Betrag': region_df['Beitrag'].map(lambda x: f"{x:.2f}".replace('.', ','))
                     })
@@ -169,23 +217,24 @@ def erstelle_zip_export(df):
                     zip_file.writestr(filename, csv_bytes)
     return zip_buffer.getvalue()
 
-if uploaded_soll_2022 and uploaded_sr_2022 and uploaded_soll_2023 and uploaded_sr_2023 and uploaded_soll_2024 and uploaded_sr_2024:
+if uploaded_soll_2022 and uploaded_sr_2022 and uploaded_soll_2023 and uploaded_sr_2023 and uploaded_soll_2024 and uploaded_sr_2024 and uploaded_soll_2025 and uploaded_sr_2025:
     df_22 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2022), lade_csv_oder_excel(uploaded_sr_2022), saison="2022/23")
     df_23 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2023), lade_csv_oder_excel(uploaded_sr_2023), saison="2023/24")
     df_24 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2024), lade_csv_oder_excel(uploaded_sr_2024), saison="2024/25")
+    df_25 = verarbeite_jahr(lade_csv_oder_excel(uploaded_soll_2024), lade_csv_oder_excel(uploaded_sr_2025), saison="2025/26")
 
-    gesamt_df = pd.concat([df_22, df_23, df_24], ignore_index=True)
+    gesamt_df = pd.concat([df_22, df_23, df_24, df_25], ignore_index=True)
     gesamt_df = gesamt_df.sort_values(by=["Vereins-Nr", "Saison"])
 
-    saison_index = {"2022/23": 0, "2023/24": 1, "2024/25": 2}
+    saison_index = {"2022/23": 0, "2023/24": 1, "2024/25": 2, "2025/26": 3}
     vereinsgruppen = gesamt_df.groupby("Vereins-Nr")
 
     beitragswerte = []
 
     for vnr, gruppe in vereinsgruppen:
         gruppe = gruppe.sort_values(by="Saison")
-        minderzahlen = [0.0, 0.0, 0.0]
-        sr_bonus = [0, 0, 0]
+        minderzahlen = [0.0, 0.0, 0.0, 0.0]
+        sr_bonus = [0, 0, 0, 0]
 
         for _, row in gruppe.iterrows():
             idx = saison_index[row["Saison"]]
@@ -212,7 +261,7 @@ if uploaded_soll_2022 and uploaded_sr_2022 and uploaded_soll_2023 and uploaded_s
         abzug_df.to_excel(writer, index=False, sheet_name="Punktabzug")
     st.download_button("📊 Gesamtauswertung als Excel-Datei", data=excel_buffer.getvalue(), file_name="SR_Minderspiele_Gesamtauswertung.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    st.markdown("## ⚖️ Punktabzug gemäß §17 SRO und SPO")
+    st.markdown("## ⚖️ Punktabzug gemäß §17 SRO und SPO Anhang II Abschnitt III.5")
     abzug_df = berechne_punktabzug(gesamt_df)
     st.dataframe(abzug_df[abzug_df['Punktabzug'] > 0])
 
